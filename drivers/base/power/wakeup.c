@@ -77,7 +77,7 @@ static DEFINE_IDA(wakeup_ida);
  * wakeup_source_create - Create a struct wakeup_source object.
  * @name: Name of the new wakeup source.
  */
-static struct wakeup_source *wakeup_source_create(const char *name)
+struct wakeup_source *wakeup_source_create(const char *name)
 {
 	struct wakeup_source *ws;
 	const char *ws_name;
@@ -106,6 +106,7 @@ err_name:
 err_ws:
 	return NULL;
 }
+EXPORT_SYMBOL_GPL(wakeup_source_create);
 
 /*
  * Record wakeup_source statistics being deleted into a dummy wakeup_source.
@@ -148,7 +149,7 @@ static void wakeup_source_free(struct wakeup_source *ws)
  *
  * Use only for wakeup source objects created with wakeup_source_create().
  */
-static void wakeup_source_destroy(struct wakeup_source *ws)
+void wakeup_source_destroy(struct wakeup_source *ws)
 {
 	if (!ws)
 		return;
@@ -157,12 +158,13 @@ static void wakeup_source_destroy(struct wakeup_source *ws)
 	wakeup_source_record(ws);
 	wakeup_source_free(ws);
 }
+EXPORT_SYMBOL_GPL(wakeup_source_destroy);
 
 /**
  * wakeup_source_add - Add given object to the list of wakeup sources.
  * @ws: Wakeup source object to add to the list.
  */
-static void wakeup_source_add(struct wakeup_source *ws)
+void wakeup_source_add(struct wakeup_source *ws)
 {
 	unsigned long flags;
 
@@ -177,12 +179,13 @@ static void wakeup_source_add(struct wakeup_source *ws)
 	list_add_rcu(&ws->entry, &wakeup_sources);
 	raw_spin_unlock_irqrestore(&events_lock, flags);
 }
+EXPORT_SYMBOL_GPL(wakeup_source_add);
 
 /**
  * wakeup_source_remove - Remove given object from the wakeup sources list.
  * @ws: Wakeup source object to remove from the list.
  */
-static void wakeup_source_remove(struct wakeup_source *ws)
+void wakeup_source_remove(struct wakeup_source *ws)
 {
 	unsigned long flags;
 
@@ -201,6 +204,7 @@ static void wakeup_source_remove(struct wakeup_source *ws)
 	 */
 	ws->timer.function = NULL;
 }
+EXPORT_SYMBOL_GPL(wakeup_source_remove);
 
 /**
  * wakeup_source_register - Create wakeup source and add it to the list.

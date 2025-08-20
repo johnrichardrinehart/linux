@@ -704,7 +704,7 @@ failed:
 	return ret;
 }
 
-static int rk_dvbm_remove(struct platform_device *pdev)
+static void rk_dvbm_remove(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 
@@ -714,8 +714,6 @@ static int rk_dvbm_remove(struct platform_device *pdev)
 		pm_runtime_put(dev);
 	}
 	pm_runtime_disable(dev);
-
-	return 0;
 }
 
 static const struct of_device_id rk_dvbm_dt_ids[] = {

@@ -938,7 +938,7 @@ static int rga2_MapUserMemory(struct page **pages, uint32_t *pageTable,
 				       pageCount, writeFlag, pages, NULL, NULL);
 #else
 	result = get_user_pages_remote(current->mm, Memory << PAGE_SHIFT,
-				       pageCount, writeFlag, pages, NULL, NULL);
+				       pageCount, writeFlag, pages, NULL);
 #endif
 
 	if (result > 0 && result >= pageCount) {

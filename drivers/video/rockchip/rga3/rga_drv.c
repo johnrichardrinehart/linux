@@ -351,9 +351,8 @@ static enum hrtimer_restart hrtimer_handler(struct hrtimer *timer)
 static void rga_init_timer(void)
 {
 	kt = ktime_set(0, RGA_TIMER_INTERVAL_NS);
-	hrtimer_init(&timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 
-	timer.function = hrtimer_handler;
+	hrtimer_setup(&timer, hrtimer_handler, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 
 	hrtimer_start(&timer, kt, HRTIMER_MODE_REL);
 }
@@ -1458,7 +1457,7 @@ pm_disable:
 	return ret;
 }
 
-static int rga_drv_remove(struct platform_device *pdev)
+static void rga_drv_remove(struct platform_device *pdev)
 {
 	struct rga_scheduler_t *scheduler = NULL;
 
@@ -1475,8 +1474,6 @@ static int rga_drv_remove(struct platform_device *pdev)
 #endif /* #ifndef RGA_DISABLE_PM */
 
 	up_write(&rga_drvdata->rwsem);
-
-	return 0;
 }
 
 static void rga_drv_shutdown(struct platform_device *pdev)
@@ -1628,6 +1625,6 @@ MODULE_AUTHOR("putin.li@rock-chips.com");
 MODULE_DESCRIPTION("Driver for rga device");
 MODULE_LICENSE("GPL");
 #ifdef MODULE_IMPORT_NS
-MODULE_IMPORT_NS(DMA_BUF);
-MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
+MODULE_IMPORT_NS("DMA_BUF");
+MODULE_IMPORT_NS("VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver");
 #endif

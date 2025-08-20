@@ -95,9 +95,7 @@ static void rve_init_timer(void)
 {
 	kt = ktime_set(0, RVE_LOAD_INTERVAL);
 
-	hrtimer_init(&timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-
-	timer.function = hrtimer_handler;
+	hrtimer_setup(&timer, hrtimer_handler, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 
 	hrtimer_start(&timer, kt, HRTIMER_MODE_REL);
 }
@@ -786,14 +784,12 @@ failed:
 #endif //RVE_PD_AWAYS_ON
 }
 
-static int rve_drv_remove(struct platform_device *pdev)
+static void rve_drv_remove(struct platform_device *pdev)
 {
 	device_init_wakeup(&pdev->dev, false);
 #ifndef RVE_PD_AWAYS_ON
 	pm_runtime_disable(&pdev->dev);
 #endif //RVE_PD_AWAYS_ON
-
-	return 0;
 }
 
 static struct platform_driver rve_driver = {

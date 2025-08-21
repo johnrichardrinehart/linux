@@ -1309,8 +1309,9 @@ void iep_soft_rst(void *base)
 	}
 	WriteReg32(base, IEP_SOFT_RST, 2);
 
-	if (i == IEP_RESET_TIMEOUT)
+	if (i == IEP_RESET_TIMEOUT) {
 		IEP_DBG("soft reset timeout.\n");
+	}
 }
 
 void iep_config_done(void *base)

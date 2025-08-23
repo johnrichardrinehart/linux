@@ -235,98 +235,98 @@ struct rockchip_pmu {
 static DEFINE_MUTEX(dmc_pmu_mutex);
 static struct rockchip_pmu *dmc_pmu;
 
-/*
- * Block PMU transitions and make sure they don't interfere with ARM Trusted
- * Firmware operations. There are two conflicts, noted in the comments below.
- *
- * Caller must unblock PMU transitions via rockchip_pmu_unblock().
- */
-int rockchip_pmu_block(void)
-{
-	struct rockchip_pmu *pmu;
-	struct generic_pm_domain *genpd;
-	struct rockchip_pm_domain *pd;
-	int i, ret;
+///*
+// * Block PMU transitions and make sure they don't interfere with ARM Trusted
+// * Firmware operations. There are two conflicts, noted in the comments below.
+// *
+// * Caller must unblock PMU transitions via rockchip_pmu_unblock().
+// */
+//int rockchip_pmu_block(void)
+//{
+//	struct rockchip_pmu *pmu;
+//	struct generic_pm_domain *genpd;
+//	struct rockchip_pm_domain *pd;
+//	int i, ret;
+//
+//	mutex_lock(&dmc_pmu_mutex);
+//
+//	/* No PMU (yet)? Then we just block rockchip_pmu_probe(). */
+//	if (!dmc_pmu)
+//		return 0;
+//	pmu = dmc_pmu;
+//
+//	/*
+//	 * mutex blocks all idle transitions: we can't touch the
+//	 * PMU_BUS_IDLE_REQ (our ".idle_offset") register while ARM Trusted
+//	 * Firmware might be using it.
+//	 */
+//	mutex_lock(&pmu->mutex);
+//
+//	/*
+//	 * Power domain clocks: Per Rockchip, we *must* keep certain clocks
+//	 * enabled for the duration of power-domain transitions. Most
+//	 * transitions are handled by this driver, but some cases (in
+//	 * particular, DRAM DVFS / memory-controller idle) must be handled by
+//	 * firmware. Firmware can handle most clock management via a special
+//	 * "ungate" register (PMU_CRU_GATEDIS_CON0), but unfortunately, this
+//	 * doesn't handle PLLs. We can assist this transition by doing the
+//	 * clock management on behalf of firmware.
+//	 */
+//	for (i = 0; i < pmu->genpd_data.num_domains; i++) {
+//		genpd = pmu->genpd_data.domains[i];
+//		if (genpd) {
+//			pd = to_rockchip_pd(genpd);
+//			ret = clk_bulk_enable(pd->num_clks, pd->clks);
+//			if (ret < 0) {
+//				dev_err(pmu->dev,
+//					"failed to enable clks for domain '%s': %d\n",
+//					genpd->name, ret);
+//				goto err;
+//			}
+//		}
+//	}
+//
+//	return 0;
+//
+//err:
+//	for (i = i - 1; i >= 0; i--) {
+//		genpd = pmu->genpd_data.domains[i];
+//		if (genpd) {
+//			pd = to_rockchip_pd(genpd);
+//			clk_bulk_disable(pd->num_clks, pd->clks);
+//		}
+//	}
+//	mutex_unlock(&pmu->mutex);
+//	mutex_unlock(&dmc_pmu_mutex);
+//
+//	return ret;
+//}
+//EXPORT_SYMBOL_GPL(rockchip_pmu_block);
 
-	mutex_lock(&dmc_pmu_mutex);
-
-	/* No PMU (yet)? Then we just block rockchip_pmu_probe(). */
-	if (!dmc_pmu)
-		return 0;
-	pmu = dmc_pmu;
-
-	/*
-	 * mutex blocks all idle transitions: we can't touch the
-	 * PMU_BUS_IDLE_REQ (our ".idle_offset") register while ARM Trusted
-	 * Firmware might be using it.
-	 */
-	mutex_lock(&pmu->mutex);
-
-	/*
-	 * Power domain clocks: Per Rockchip, we *must* keep certain clocks
-	 * enabled for the duration of power-domain transitions. Most
-	 * transitions are handled by this driver, but some cases (in
-	 * particular, DRAM DVFS / memory-controller idle) must be handled by
-	 * firmware. Firmware can handle most clock management via a special
-	 * "ungate" register (PMU_CRU_GATEDIS_CON0), but unfortunately, this
-	 * doesn't handle PLLs. We can assist this transition by doing the
-	 * clock management on behalf of firmware.
-	 */
-	for (i = 0; i < pmu->genpd_data.num_domains; i++) {
-		genpd = pmu->genpd_data.domains[i];
-		if (genpd) {
-			pd = to_rockchip_pd(genpd);
-			ret = clk_bulk_enable(pd->num_clks, pd->clks);
-			if (ret < 0) {
-				dev_err(pmu->dev,
-					"failed to enable clks for domain '%s': %d\n",
-					genpd->name, ret);
-				goto err;
-			}
-		}
-	}
-
-	return 0;
-
-err:
-	for (i = i - 1; i >= 0; i--) {
-		genpd = pmu->genpd_data.domains[i];
-		if (genpd) {
-			pd = to_rockchip_pd(genpd);
-			clk_bulk_disable(pd->num_clks, pd->clks);
-		}
-	}
-	mutex_unlock(&pmu->mutex);
-	mutex_unlock(&dmc_pmu_mutex);
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(rockchip_pmu_block);
-
-/* Unblock PMU transitions. */
-void rockchip_pmu_unblock(void)
-{
-	struct rockchip_pmu *pmu;
-	struct generic_pm_domain *genpd;
-	struct rockchip_pm_domain *pd;
-	int i;
-
-	if (dmc_pmu) {
-		pmu = dmc_pmu;
-		for (i = 0; i < pmu->genpd_data.num_domains; i++) {
-			genpd = pmu->genpd_data.domains[i];
-			if (genpd) {
-				pd = to_rockchip_pd(genpd);
-				clk_bulk_disable(pd->num_clks, pd->clks);
-			}
-		}
-
-		mutex_unlock(&pmu->mutex);
-	}
-
-	mutex_unlock(&dmc_pmu_mutex);
-}
-EXPORT_SYMBOL_GPL(rockchip_pmu_unblock);
+///* Unblock PMU transitions. */
+//void rockchip_pmu_unblock(void)
+//{
+//	struct rockchip_pmu *pmu;
+//	struct generic_pm_domain *genpd;
+//	struct rockchip_pm_domain *pd;
+//	int i;
+//
+//	if (dmc_pmu) {
+//		pmu = dmc_pmu;
+//		for (i = 0; i < pmu->genpd_data.num_domains; i++) {
+//			genpd = pmu->genpd_data.domains[i];
+//			if (genpd) {
+//				pd = to_rockchip_pd(genpd);
+//				clk_bulk_disable(pd->num_clks, pd->clks);
+//			}
+//		}
+//
+//		mutex_unlock(&pmu->mutex);
+//	}
+//
+//	mutex_unlock(&dmc_pmu_mutex);
+//}
+//EXPORT_SYMBOL_GPL(rockchip_pmu_unblock);
 
 #define DOMAIN_RK3588(name, p_offset, pwr, status, m_offset, m_status, r_status, r_offset, req, idle, wakeup, regulator)	\
 	DOMAIN_M_O_R(name, p_offset, pwr, status, m_offset, m_status, r_status, r_offset, req, idle, idle, wakeup, regulator)

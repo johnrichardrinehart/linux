@@ -80,7 +80,7 @@ static long rga_get_user_pages(struct page **pages, unsigned long Memory,
 	#else
 		return get_user_pages_remote(current_mm, Memory << PAGE_SHIFT,
 					     pageCount, writeFlag ? FOLL_WRITE : 0, pages,
-					     NULL, NULL);
+					     NULL);
 	#endif
 }
 

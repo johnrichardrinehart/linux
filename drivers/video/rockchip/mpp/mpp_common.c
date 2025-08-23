@@ -31,6 +31,7 @@
 #include <linux/nospec.h>
 
 #include <soc/rockchip/pm_domains.h>
+#include <soc/rockchip/rockchip_iommu.h>
 
 #include "mpp_debug.h"
 #include "mpp_common.h"

@@ -9,6 +9,7 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/of.h>
+#include <linux/of_device.h>
 #include <linux/regulator/machine.h>
 #include <linux/regulator/driver.h>
 #include <linux/regulator/of_regulator.h>
@@ -366,6 +367,15 @@ struct regulator_init_data *of_get_regulator_init_data(struct device *dev,
 }
 EXPORT_SYMBOL_GPL(of_get_regulator_init_data);
 
+struct regulator_dev *of_find_regulator_by_node(struct device_node *np)
+{
+	struct device *dev;
+
+	dev = class_find_device_by_of_node(&regulator_class, np);
+
+	return dev ? dev_to_rdev(dev) : NULL;
+}
+
 struct devm_of_regulator_matches {
 	struct of_regulator_match *matches;
 	unsigned int num_matches;
@@ -631,15 +641,6 @@ static struct device_node *of_get_regulator(struct device *dev, struct device_no
 
 	dev_dbg(dev, "Looking up %s property in node %pOF failed\n", prop_name, dev->of_node);
 	return NULL;
-}
-
-static struct regulator_dev *of_find_regulator_by_node(struct device_node *np)
-{
-	struct device *dev;
-
-	dev = class_find_device_by_of_node(&regulator_class, np);
-
-	return dev ? dev_to_rdev(dev) : NULL;
 }
 
 /**

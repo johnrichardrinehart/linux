@@ -5,6 +5,7 @@
  * Copyright (c) 2015 Rockchip Electronics Co., Ltd.
  */
 
+#include <linux/platform_device.h>
 #include <linux/module.h>
 #include <linux/io.h>
 #include <linux/iopoll.h>
@@ -13,6 +14,7 @@
 #include <linux/pm_clock.h>
 #include <linux/pm_domain.h>
 #include <linux/of_address.h>
+#include <linux/of_device.h>
 #include <linux/of_clk.h>
 #include <linux/of_platform.h>
 #include <linux/clk.h>

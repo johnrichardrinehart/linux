@@ -63,7 +63,7 @@ static void rk_dmabuf_dump_sgt(const struct dma_buf *dmabuf, void *private)
 	dma_resv_lock(dmabuf->resv, NULL);
 
 	list_for_each_entry_safe(a, t, &dmabuf->attachments, node) {
-		if (!a->sgt)
+		if (!a->dma_buf->ops->sgt)
 			continue;
 		for_each_sgtable_sg(a->sgt, sg, i) {
 			end = sg->dma_address + sg->length - 1;

@@ -482,6 +482,7 @@ struct rockchip_clk_provider {
 	struct clk_onecell_data clk_data;
 	struct device_node *cru_node;
 	struct regmap *grf;
+	struct regmap *pmugrf;
 	DECLARE_HASHTABLE(aux_grf_table, GRF_HASH_ORDER);
 	spinlock_t lock;
 };
@@ -641,6 +642,15 @@ struct clk *rockchip_clk_register_ddrclk(const char *name, int flags,
 					 int div_shift, int div_width,
 					 int ddr_flags, void __iomem *reg_base,
 					 spinlock_t *lock);
+
+#if IS_REACHABLE(CONFIG_ROCKCHIP_CLK_PVTPLL)
+int rockchip_pvtpll_volt_sel_adjust(u32 clock_id, u32 volt_sel);
+#else
+static inline int rockchip_pvtpll_volt_sel_adjust(u32 clock_id, u32 volt_sel)
+{
+	return -ENODEV;
+}
+#endif
 
 #define ROCKCHIP_INVERTER_HIWORD_MASK	BIT(0)
 
@@ -1209,6 +1219,9 @@ void rockchip_clk_register_armclk(struct rockchip_clk_provider *ctx,
 			const struct rockchip_cpuclk_rate_table *rates,
 			int nrates);
 void rockchip_clk_protect_critical(const char *const clocks[], int nclocks);
+int rockchip_pll_clk_rate_to_scale(struct clk *clk, unsigned long rate);
+int rockchip_pll_clk_scale_to_rate(struct clk *clk, unsigned int scale);
+int rockchip_pll_clk_adaptive_scaling(struct clk *clk, int sel);
 void rockchip_register_restart_notifier(struct rockchip_clk_provider *ctx,
 					unsigned int reg, void (*cb)(void));
 
@@ -1251,4 +1264,25 @@ void rk3562_rst_init(struct device_node *np, void __iomem *reg_base);
 void rk3576_rst_init(struct device_node *np, void __iomem *reg_base);
 void rk3588_rst_init(struct device_node *np, void __iomem *reg_base);
 
+#if IS_MODULE(CONFIG_COMMON_CLK_ROCKCHIP)
+int rockchip_clk_protect(struct rockchip_clk_provider *ctx,
+			 unsigned int *clocks, unsigned int nclocks);
+void rockchip_clk_unprotect(void);
+void rockchip_clk_disable_unused(void);
+#else
+static inline int rockchip_clk_protect(struct rockchip_clk_provider *ctx,
+				       unsigned int *clocks,
+				       unsigned int nclocks)
+{
+	return -EOPNOTSUPP;
+}
+
+static inline void rockchip_clk_unprotect(void)
+{
+}
+
+static inline void rockchip_clk_disable_unused(void)
+{
+}
+#endif
 #endif

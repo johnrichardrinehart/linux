@@ -29,9 +29,12 @@ static void cma_procfs_format_array(char *buf, size_t bufsize, u32 *array, int a
 
 static void cma_procfs_show_bitmap(struct seq_file *s, struct cma *cma)
 {
-	int elements = DIV_ROUND_UP(cma_bitmap_maxno(cma), BITS_PER_BYTE * sizeof(u32));
+	int elements = DIV_ROUND_UP(rk_cma_bitmap_maxno(cma), BITS_PER_BYTE * sizeof(u32));
 	int size = elements * 9;
-	u32 *array = (u32 *)cma->bitmap;
+	struct cma_memrange *cmr;
+
+	cmr = &cma->ranges[0];
+	u32 *array = (u32 *)(cmr->bitmap);
 	char *buf;
 
 	buf = kmalloc(size + 1, GFP_KERNEL);
@@ -50,8 +53,11 @@ static u64 cma_procfs_used_get(struct cma *cma)
 	unsigned long flags;
 	unsigned long used;
 
+	struct cma_memrange *cmr;
+	cmr = &cma->ranges[0];
+
 	spin_lock_irqsave(&cma->lock, flags);
-	used = bitmap_weight(cma->bitmap, (int)cma_bitmap_maxno(cma));
+	used = bitmap_weight(cmr->bitmap, (int)rk_cma_bitmap_maxno(cma));
 	spin_unlock_irqrestore(&cma->lock, flags);
 
 	return (u64)used << cma->order_per_bit;

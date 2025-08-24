@@ -139,7 +139,8 @@ static void desc_set_defaults(unsigned int irq, struct irq_desc *desc, int node,
 	desc_smp_init(desc, node, affinity);
 }
 
-static unsigned int nr_irqs = NR_IRQS;
+unsigned int nr_irqs = NR_IRQS;
+EXPORT_SYMBOL_GPL(nr_irqs);
 
 /**
  * irq_get_nr_irqs() - Number of interrupts supported by the system.
@@ -415,9 +416,10 @@ struct irq_desc *irq_to_desc(unsigned int irq)
 {
 	return mtree_load(&sparse_irqs, irq);
 }
-#ifdef CONFIG_KVM_BOOK3S_64_HV_MODULE
 EXPORT_SYMBOL_GPL(irq_to_desc);
-#endif
+//#ifdef CONFIG_KVM_BOOK3S_64_HV_MODULE
+//EXPORT_SYMBOL_GPL(irq_to_desc);
+//#endif
 
 void irq_lock_sparse(void)
 {

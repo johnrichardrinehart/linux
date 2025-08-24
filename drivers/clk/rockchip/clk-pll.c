@@ -23,6 +23,30 @@
 #define PLL_MODE_DEEP		0x2
 #define PLL_RK3328_MODE_MASK	0x1
 
+#define to_rockchip_clk_pll(_hw) container_of(_hw, struct rockchip_clk_pll, hw)
+#define to_rockchip_clk_pll_nb(nb) \
+			container_of(nb, struct rockchip_clk_pll, clk_nb)
+
+//struct rockchip_clk_pll {
+//	struct clk_hw		hw;
+//
+//	struct clk_mux		pll_mux;
+//	const struct clk_ops	*pll_mux_ops;
+//
+//	struct notifier_block	clk_nb;
+//
+//	void __iomem		*reg_base;
+//	int			lock_offset;
+//	unsigned int		lock_shift;
+//	enum rockchip_pll_type	type;
+//	u8			flags;
+//	const struct rockchip_pll_rate_table *rate_table;
+//	unsigned int		rate_count;
+//	spinlock_t		*lock;
+//
+//	struct rockchip_clk_provider *ctx;
+//};
+
 struct rockchip_clk_pll {
 	struct clk_hw		hw;
 
@@ -38,14 +62,90 @@ struct rockchip_clk_pll {
 	u8			flags;
 	const struct rockchip_pll_rate_table *rate_table;
 	unsigned int		rate_count;
+	int			sel;
+	unsigned long		scaling;
 	spinlock_t		*lock;
 
 	struct rockchip_clk_provider *ctx;
+
+#ifdef CONFIG_ROCKCHIP_CLK_BOOST
+	bool			boost_enabled;
+	u32			boost_backup_pll_usage;
+	unsigned long		boost_backup_pll_rate;
+	unsigned long		boost_low_rate;
+	unsigned long		boost_high_rate;
+	struct regmap		*boost;
+#endif
+#ifdef CONFIG_DEBUG_FS
+	struct hlist_node	debug_node;
+#endif
 };
 
-#define to_rockchip_clk_pll(_hw) container_of(_hw, struct rockchip_clk_pll, hw)
-#define to_rockchip_clk_pll_nb(nb) \
-			container_of(nb, struct rockchip_clk_pll, clk_nb)
+int rockchip_pll_clk_adaptive_scaling(struct clk *clk, int sel)
+{
+	struct clk *parent = clk_get_parent(clk);
+	struct rockchip_clk_pll *pll;
+
+	if (IS_ERR_OR_NULL(parent))
+		return -EINVAL;
+
+	pll = to_rockchip_clk_pll(__clk_get_hw(parent));
+	if (!pll)
+		return -EINVAL;
+
+	pll->sel = sel;
+
+	return 0;
+}
+EXPORT_SYMBOL(rockchip_pll_clk_adaptive_scaling);
+
+int rockchip_pll_clk_scale_to_rate(struct clk *clk, unsigned int scale)
+{
+	const struct rockchip_pll_rate_table *rate_table;
+	struct clk *parent = clk_get_parent(clk);
+	struct rockchip_clk_pll *pll;
+	unsigned int i;
+
+	if (IS_ERR_OR_NULL(parent))
+		return -EINVAL;
+
+	pll = to_rockchip_clk_pll(__clk_get_hw(parent));
+	if (!pll)
+		return -EINVAL;
+
+	rate_table = pll->rate_table;
+	for (i = 0; i < pll->rate_count; i++) {
+		if (i == scale)
+			return rate_table[i].rate;
+	}
+
+	return -EINVAL;
+}
+EXPORT_SYMBOL(rockchip_pll_clk_scale_to_rate);
+
+int rockchip_pll_clk_rate_to_scale(struct clk *clk, unsigned long rate)
+{
+	const struct rockchip_pll_rate_table *rate_table;
+	struct clk *parent = clk_get_parent(clk);
+	struct rockchip_clk_pll *pll;
+	unsigned int i;
+
+	if (IS_ERR_OR_NULL(parent))
+		return -EINVAL;
+
+	pll = to_rockchip_clk_pll(__clk_get_hw(parent));
+	if (!pll)
+		return -EINVAL;
+
+	rate_table = pll->rate_table;
+	for (i = 0; i < pll->rate_count; i++) {
+		if (rate >= rate_table[i].rate)
+			return i;
+	}
+
+	return -EINVAL;
+}
+EXPORT_SYMBOL(rockchip_pll_clk_rate_to_scale);
 
 static const struct rockchip_pll_rate_table *rockchip_get_pll_settings(
 			    struct rockchip_clk_pll *pll, unsigned long rate)

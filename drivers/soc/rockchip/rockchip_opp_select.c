@@ -16,12 +16,14 @@
 #include <linux/slab.h>
 #include <linux/soc/rockchip/pvtm.h>
 #include <linux/thermal.h>
+#include <linux/rockchip_thermal.h>
 #include <linux/pm_opp.h>
 #include <linux/version.h>
 #include <soc/rockchip/rockchip_opp_select.h>
 
 #include "../../clk/rockchip/clk.h"
 #include "../../opp/opp.h"
+//#include "../../opp/rockchip_opp.h"
 #include "../../devfreq/governor.h"
 
 #define MAX_PROP_NAME_LEN	6
@@ -2398,12 +2400,12 @@ int rockchip_opp_config_clks(struct device *dev, struct opp_table *opp_table,
 		return ret;
 	}
 
-	dev_dbg(dev, "%lu -> %lu (Hz)\n", opp_table->rate_clk_single, *target);
+	dev_dbg(dev, "%lu -> %lu (Hz)\n", opp_table->current_rate_single_clk, *target);
 	ret = clk_set_rate(opp_table->clk, *target);
 	if (ret)
 		dev_err(dev, "failed to set clock rate: %lu\n", *target);
 	else
-		opp_table->rate_clk_single = *target;
+		opp_table->current_rate_single_clk = *target;
 
 	clk_bulk_disable_unprepare(info->nclocks, info->clocks);
 

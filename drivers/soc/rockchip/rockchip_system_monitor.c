@@ -15,6 +15,7 @@
 #include <linux/mutex.h>
 #include <linux/notifier.h>
 #include <linux/of.h>
+#include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/pm_opp.h>
 #include <linux/pm_qos.h>
@@ -1451,14 +1452,14 @@ static int rockchip_system_monitor_temp_notify(int temp)
 	return notifier_to_errno(ret);
 }
 
-static int notify_dummy(struct thermal_zone_device *tz, int trip)
-{
-	return 0;
-}
+//static int notify_dummy(struct thermal_zone_device *tz, int trip)
+//{
+//	return 0;
+//}
 
 static struct thermal_governor thermal_gov_dummy = {
 	.name		= "dummy",
-	.throttle	= notify_dummy,
+//	.throttle	= notify_dummy,
 };
 
 static int rockchip_system_monitor_parse_dt(struct system_monitor *monitor)

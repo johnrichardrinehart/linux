@@ -4,6 +4,7 @@
 
 #include <uapi/linux/irqnr.h>
 
+extern unsigned int nr_irqs;
 
 unsigned int irq_get_nr_irqs(void) __pure;
 unsigned int irq_set_nr_irqs(unsigned int nr);

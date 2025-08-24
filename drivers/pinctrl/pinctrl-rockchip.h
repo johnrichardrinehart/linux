@@ -468,4 +468,19 @@ struct rockchip_pinctrl {
 	unsigned int			nfunctions;
 };
 
+#if IS_ENABLED(CONFIG_PINCTRL_ROCKCHIP)
+int rk_iomux_set(int bank, int pin, int mux);
+int rk_iomux_get(int bank, int pin, int *mux);
+#else
+static inline int rk_iomux_set(int bank, int pin, int mux)
+{
+	return -EINVAL;
+}
+
+static inline int rk_iomux_get(int bank, int pin, int *mux)
+{
+	return -EINVAL;
+}
+#endif
+
 #endif

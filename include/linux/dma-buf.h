@@ -568,6 +568,8 @@ static inline bool dma_buf_is_dynamic(struct dma_buf *dmabuf)
 	return !!dmabuf->ops->pin;
 }
 
+int dma_buf_get_each(int (*callback)(const struct dma_buf *dmabuf,
+		     void *private), void *private);
 struct dma_buf_attachment *dma_buf_attach(struct dma_buf *dmabuf,
 					  struct device *dev);
 struct dma_buf_attachment *
@@ -609,4 +611,15 @@ int dma_buf_vmap_unlocked(struct dma_buf *dmabuf, struct iosys_map *map);
 void dma_buf_vunmap_unlocked(struct dma_buf *dmabuf, struct iosys_map *map);
 struct dma_buf *dma_buf_iter_begin(void);
 struct dma_buf *dma_buf_iter_next(struct dma_buf *dmbuf);
+
+#if IS_ENABLED(CONFIG_RK_DMABUF_DEBUG)
+void dma_buf_reset_peak_size(void);
+size_t dma_buf_get_peak_size(void);
+size_t dma_buf_get_total_size(void);
+#else
+static inline void dma_buf_reset_peak_size(void) {}
+static inline size_t dma_buf_get_peak_size(void) { return 0; }
+static inline size_t dma_buf_get_total_size(void) { return 0; }
+#endif
+
 #endif /* __DMA_BUF_H__ */

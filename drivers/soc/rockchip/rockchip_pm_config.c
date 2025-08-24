@@ -525,7 +525,6 @@ static int pm_config_probe(struct platform_device *pdev)
 	struct device_node *node;
 	struct rk_sleep_config *config;
 
-	enum of_gpio_flags flags;
 	int i = 0;
 	int length;
 	int ret;
@@ -585,10 +584,9 @@ static int pm_config_probe(struct platform_device *pdev)
 
 		for (i = 0; i < length; i++) {
 			config->power_ctrl_config[i] =
-				of_get_named_gpio_flags(node,
+				of_get_named_gpio(node,
 							"rockchip,power-ctrl",
-							i,
-							&flags);
+							i);
 			if (!gpio_is_valid(config->power_ctrl_config[i]))
 				break;
 			sip_smc_set_suspend_mode(GPIO_POWER_CONFIG,

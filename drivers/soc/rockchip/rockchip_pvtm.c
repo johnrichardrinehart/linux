@@ -15,6 +15,7 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_clk.h>
+#include <linux/of_device.h>
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
@@ -22,6 +23,7 @@
 #include <linux/slab.h>
 #include <linux/soc/rockchip/pvtm.h>
 #include <linux/thermal.h>
+#include <linux/rockchip_thermal.h>
 
 #define wr_mask_bit(v, off, mask)	((v) << (off) | (mask) << (16 + off))
 

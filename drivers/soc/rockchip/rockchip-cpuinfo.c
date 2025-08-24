@@ -307,3 +307,4 @@ static void __exit rockchip_cpuinfo_exit(void)
 module_exit(rockchip_cpuinfo_exit);
 
 MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("John - placeholder");

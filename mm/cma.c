@@ -1028,6 +1028,7 @@ int cma_for_each_area(int (*it)(struct cma *cma, void *data), void *data)
 
 	return 0;
 }
+EXPORT_SYMBOL(cma_for_each_area);
 
 bool cma_intersects(struct cma *cma, unsigned long start, unsigned long end)
 {

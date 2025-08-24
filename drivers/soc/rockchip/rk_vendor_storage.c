@@ -48,3 +48,4 @@ bool is_rk_vendor_ready(void)
 EXPORT_SYMBOL(is_rk_vendor_ready);
 
 MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("John - placeholder");

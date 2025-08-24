@@ -87,6 +87,11 @@ static struct resource mem_res[] = {
  */
 u64 __cacheline_aligned boot_args[4];
 
+unsigned int system_serial_low;
+unsigned int system_serial_high;
+EXPORT_SYMBOL(system_serial_low);
+EXPORT_SYMBOL(system_serial_high);
+
 void __init smp_setup_processor_id(void)
 {
 	u64 mpidr = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;

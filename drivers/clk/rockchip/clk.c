@@ -394,14 +394,6 @@ err_free:
 	return ERR_PTR(-ENOMEM);
 }
 
-struct rockchip_clk_provider *rockchip_clk_init(struct device_node *np,
-						void __iomem *base,
-						unsigned long nr_clks)
-{
-	return rockchip_clk_init_base(np, base, nr_clks, false);
-}
-EXPORT_SYMBOL_GPL(rockchip_clk_init);
-
 struct rockchip_clk_provider *rockchip_clk_init_early(struct device_node *np,
 						      void __iomem *base,
 						      unsigned long nr_clks)
@@ -419,6 +411,49 @@ void rockchip_clk_finalize(struct rockchip_clk_provider *ctx)
 			ctx->clk_data.clks[i] = ERR_PTR(-ENOENT);
 }
 EXPORT_SYMBOL_GPL(rockchip_clk_finalize);
+
+struct rockchip_clk_provider *rockchip_clk_init(struct device_node *np,
+						void __iomem *base,
+						unsigned long nr_clks)
+{
+	struct rockchip_clk_provider *ctx;
+	struct clk **clk_table;
+	int i;
+
+	ctx = kzalloc(sizeof(struct rockchip_clk_provider), GFP_KERNEL);
+	if (!ctx)
+		return ERR_PTR(-ENOMEM);
+
+	clk_table = kcalloc(nr_clks, sizeof(struct clk *), GFP_KERNEL);
+	if (!clk_table)
+		goto err_free;
+
+	for (i = 0; i < nr_clks; ++i)
+		clk_table[i] = ERR_PTR(-ENOENT);
+
+	ctx->reg_base = base;
+	ctx->clk_data.clks = clk_table;
+	ctx->clk_data.clk_num = nr_clks;
+	ctx->cru_node = np;
+	spin_lock_init(&ctx->lock);
+
+	ctx->grf = syscon_regmap_lookup_by_phandle(ctx->cru_node,
+						   "rockchip,grf");
+	ctx->pmugrf = syscon_regmap_lookup_by_phandle(ctx->cru_node,
+						   "rockchip,pmugrf");
+
+#ifdef MODULE
+	hlist_add_head(&ctx->list_node, &clk_ctx_list);
+#endif
+
+	return ctx;
+
+err_free:
+	kfree(ctx);
+	return ERR_PTR(-ENOMEM);
+}
+EXPORT_SYMBOL_GPL(rockchip_clk_init);
+
 
 void rockchip_clk_of_add_provider(struct device_node *np,
 				  struct rockchip_clk_provider *ctx)
@@ -770,3 +805,82 @@ rockchip_register_restart_notifier(struct rockchip_clk_provider *ctx,
 		       __func__, ret);
 }
 EXPORT_SYMBOL_GPL(rockchip_register_restart_notifier);
+
+#ifdef MODULE
+static struct clk **protect_clocks;
+static unsigned int protect_nclocks;
+
+int rockchip_clk_protect(struct rockchip_clk_provider *ctx,
+			 unsigned int *clocks, unsigned int nclocks)
+{
+	struct clk *clk = NULL;
+	int i = 0;
+
+	if (protect_clocks || !ctx || !clocks || !ctx->clk_data.clks)
+		return 0;
+
+	protect_clocks = kcalloc(nclocks, sizeof(void *), GFP_KERNEL);
+	if (!protect_clocks)
+		return -ENOMEM;
+
+	for (i = 0; i < nclocks; i++) {
+		if (clocks[i] >= ctx->clk_data.clk_num) {
+			pr_err("%s: invalid clock id %u\n", __func__, clocks[i]);
+			continue;
+		}
+		clk = ctx->clk_data.clks[clocks[i]];
+		if (clk) {
+			clk_prepare_enable(clk);
+			protect_clocks[i] = clk;
+		}
+	}
+	protect_nclocks = nclocks;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(rockchip_clk_protect);
+
+void rockchip_clk_unprotect(void)
+{
+	int i = 0;
+
+	if (!protect_clocks || !protect_nclocks)
+		return;
+
+	for (i = 0; i < protect_nclocks; i++) {
+		if (protect_clocks[i])
+			clk_disable_unprepare(protect_clocks[i]);
+	}
+	protect_nclocks = 0;
+	kfree(protect_clocks);
+	protect_clocks = NULL;
+
+}
+EXPORT_SYMBOL_GPL(rockchip_clk_unprotect);
+
+void rockchip_clk_disable_unused(void)
+{
+	struct rockchip_clk_provider *ctx;
+	struct clk *clk;
+	struct clk_hw *hw;
+	int i = 0, flag = 0;
+
+	hlist_for_each_entry(ctx, &clk_ctx_list, list_node) {
+		for (i = 0; i < ctx->clk_data.clk_num; i++) {
+			clk = ctx->clk_data.clks[i];
+			if (clk && !IS_ERR(clk)) {
+				hw = __clk_get_hw(clk);
+				if (hw)
+					flag = clk_hw_get_flags(hw);
+				if (flag & CLK_IGNORE_UNUSED)
+					continue;
+				if (flag & CLK_IS_CRITICAL)
+					continue;
+				clk_prepare_enable(clk);
+				clk_disable_unprepare(clk);
+			}
+		}
+	}
+}
+EXPORT_SYMBOL_GPL(rockchip_clk_disable_unused);
+#endif /* MODULE */

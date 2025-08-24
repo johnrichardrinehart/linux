@@ -58,6 +58,7 @@
 #include <linux/panic_notifier.h>
 #include <linux/kernel_stat.h>
 #include <linux/irq.h>
+#include <linux/irqnr.h>
 #include <linux/delay.h>
 
 #if IS_ENABLED(CONFIG_ROCKCHIP_MINIDUMP)
@@ -87,8 +88,8 @@ static void __iomem *rockchip_cs_pmu[16];
 static bool edpcsr_present;
 static char log_buf[1024];
 
-extern struct atomic_notifier_head hardlock_notifier_list;
-extern struct atomic_notifier_head rcu_stall_notifier_list;
+//extern struct atomic_notifier_head hardlock_notifier_list;
+//extern struct atomic_notifier_head rcu_stall_notifier_list;
 
 static inline void rockchip_debug_serror_enable(void)
 {
@@ -420,7 +421,7 @@ static int rockchip_show_interrupts(char *p, int irq)
 {
 	static int prec;
 	char *buf = p;
-	unsigned long any_count = 0;
+	unsigned int any_count = 0;
 	int i = irq, j;
 	struct irqaction *action;
 	struct irq_desc *desc;
@@ -445,7 +446,7 @@ static int rockchip_show_interrupts(char *p, int irq)
 
 	if (desc->kstat_irqs)
 		for_each_possible_cpu(j)
-			any_count |= *per_cpu_ptr(desc->kstat_irqs, j);
+			any_count |= *per_cpu_ptr(&desc->kstat_irqs->cnt, j);
 
 	if ((!desc->action) && !any_count)
 		goto outsparse;
@@ -453,7 +454,7 @@ static int rockchip_show_interrupts(char *p, int irq)
 	buf += sprintf(buf, "%*d: ", prec, i);
 	for_each_possible_cpu(j)
 		buf += sprintf(buf, "%10u ", desc->kstat_irqs ?
-					*per_cpu_ptr(desc->kstat_irqs, j) : 0);
+					*per_cpu_ptr(&desc->kstat_irqs->cnt, j) : 0);
 
 	if (desc->irq_data.chip) {
 		if (desc->irq_data.chip->name)
@@ -510,73 +511,73 @@ static int rockchip_panic_notify(struct notifier_block *nb, unsigned long event,
 	return NOTIFY_OK;
 }
 
-static int rockchip_hardlock_notify(struct notifier_block *nb,
-				    unsigned long event, void *p)
-{
-	u64 pmpcsr;
-	int el;
-	u32 pu = 0;
-	void *pc = NULL;
-	void __iomem *base;
-	unsigned long edpcsr;
-	unsigned long cpu = event;
-
-	rockchip_debug_serror_disable();
-
-	pu = (u32)readl(rockchip_cpu_debug[cpu] + EDPRSR) & EDPRSR_PU;
-	if (pu != EDPRSR_PU) {
-		pr_err("CPU%ld power down\n", cpu);
-		return NOTIFY_OK;
-	}
-
-	if (edpcsr_present) {
-		base = rockchip_cpu_debug[cpu];
-		/* Unlock EDLSR.SLK so that EDPCSRhi gets populated */
-		writel(EDLAR_UNLOCK, base + EDLAR);
-		if (sizeof(edpcsr) == 8)
-			edpcsr = ((u64)readl(base + EDPCSR_LO)) |
-				 ((u64)readl(base + EDPCSR_HI) << 32);
-		else
-			edpcsr = (u32)readl(base + EDPCSR_LO);
-
-		/* NOTE: no offset on ARMv8; see DBGDEVID1.PCSROffset */
-		pc = (void *)(edpcsr & ~1);
-	} else {
-		base = rockchip_cs_pmu[cpu];
-		pmpcsr = ((u64)readl(base + PMPCSR_LO)) |
-			 ((u64)readl(base + PMPCSR_HI) << 32);
-		el = (pmpcsr >> 61) & 0x3;
-		if (el == 2)
-			pmpcsr |= 0xff00000000000000;
-		else
-			pmpcsr &= 0x0fffffffffffffff;
-		/* NOTE: no offset on ARMv8; see DBGDEVID1.PCSROffset */
-		pc = (void *)(uintptr_t)(pmpcsr & ~1);
-	}
-
-	rockchip_debug_serror_enable();
-
-#if IS_ENABLED(CONFIG_ROCKCHIP_MINIDUMP)
-	rk_minidump_hardlock_notify(nb, event, pc);
-#endif
-
-#if !IS_ENABLED(CONFIG_BOOTPARAM_HARDLOCKUP_PANIC)
-	rockchip_panic_notify(nb, event, p);
-#endif
-	return NOTIFY_OK;
-}
+//static int rockchip_hardlock_notify(struct notifier_block *nb,
+//				    unsigned long event, void *p)
+//{
+//	u64 pmpcsr;
+//	int el;
+//	u32 pu = 0;
+//	void *pc = NULL;
+//	void __iomem *base;
+//	unsigned long edpcsr;
+//	unsigned long cpu = event;
+//
+//	rockchip_debug_serror_disable();
+//
+//	pu = (u32)readl(rockchip_cpu_debug[cpu] + EDPRSR) & EDPRSR_PU;
+//	if (pu != EDPRSR_PU) {
+//		pr_err("CPU%ld power down\n", cpu);
+//		return NOTIFY_OK;
+//	}
+//
+//	if (edpcsr_present) {
+//		base = rockchip_cpu_debug[cpu];
+//		/* Unlock EDLSR.SLK so that EDPCSRhi gets populated */
+//		writel(EDLAR_UNLOCK, base + EDLAR);
+//		if (sizeof(edpcsr) == 8)
+//			edpcsr = ((u64)readl(base + EDPCSR_LO)) |
+//				 ((u64)readl(base + EDPCSR_HI) << 32);
+//		else
+//			edpcsr = (u32)readl(base + EDPCSR_LO);
+//
+//		/* NOTE: no offset on ARMv8; see DBGDEVID1.PCSROffset */
+//		pc = (void *)(edpcsr & ~1);
+//	} else {
+//		base = rockchip_cs_pmu[cpu];
+//		pmpcsr = ((u64)readl(base + PMPCSR_LO)) |
+//			 ((u64)readl(base + PMPCSR_HI) << 32);
+//		el = (pmpcsr >> 61) & 0x3;
+//		if (el == 2)
+//			pmpcsr |= 0xff00000000000000;
+//		else
+//			pmpcsr &= 0x0fffffffffffffff;
+//		/* NOTE: no offset on ARMv8; see DBGDEVID1.PCSROffset */
+//		pc = (void *)(uintptr_t)(pmpcsr & ~1);
+//	}
+//
+//	rockchip_debug_serror_enable();
+//
+//#if IS_ENABLED(CONFIG_ROCKCHIP_MINIDUMP)
+//	rk_minidump_hardlock_notify(nb, event, pc);
+//#endif
+//
+//#if !IS_ENABLED(CONFIG_BOOTPARAM_HARDLOCKUP_PANIC)
+//	rockchip_panic_notify(nb, event, p);
+//#endif
+//	return NOTIFY_OK;
+//}
 
 static struct notifier_block rockchip_panic_nb = {
 	.notifier_call = rockchip_panic_notify,
 };
 
-static struct notifier_block rockchip_rcu_stall_nb = {
-	.notifier_call = rockchip_panic_notify,
-};
-
-static struct notifier_block rockchip_hardlock_nb = {
-	.notifier_call = rockchip_hardlock_notify,
-};
+//static struct notifier_block rockchip_rcu_stall_nb = {
+//	.notifier_call = rockchip_panic_notify,
+//};
+//
+//static struct notifier_block rockchip_hardlock_nb = {
+//	.notifier_call = rockchip_hardlock_notify,
+//};
 
 static const struct of_device_id rockchip_debug_dt_match[] __initconst = {
 	/* external debug */
@@ -637,14 +638,14 @@ static int __init rockchip_debug_init(void)
 
 	atomic_notifier_chain_register(&panic_notifier_list,
 				       &rockchip_panic_nb);
-	if (IS_ENABLED(CONFIG_NO_GKI)) {
-		if (IS_ENABLED(CONFIG_HARDLOCKUP_DETECTOR))
-			atomic_notifier_chain_register(&hardlock_notifier_list,
-						       &rockchip_hardlock_nb);
-
-		atomic_notifier_chain_register(&rcu_stall_notifier_list,
-					       &rockchip_rcu_stall_nb);
-	}
+//	if (IS_ENABLED(CONFIG_NO_GKI)) {
+//		if (IS_ENABLED(CONFIG_HARDLOCKUP_DETECTOR))
+//			atomic_notifier_chain_register(&hardlock_notifier_list,
+//						       &rockchip_hardlock_nb);
+//
+//		atomic_notifier_chain_register(&rcu_stall_notifier_list,
+//					       &rockchip_rcu_stall_nb);
+//	}
 
 	return 0;
 }
@@ -656,14 +657,14 @@ static void __exit rockchip_debug_exit(void)
 
 	atomic_notifier_chain_unregister(&panic_notifier_list,
 					 &rockchip_panic_nb);
-	if (IS_ENABLED(CONFIG_NO_GKI)) {
-		if (IS_ENABLED(CONFIG_HARDLOCKUP_DETECTOR))
-			atomic_notifier_chain_unregister(&hardlock_notifier_list,
-							 &rockchip_hardlock_nb);
-
-		atomic_notifier_chain_unregister(&rcu_stall_notifier_list,
-						 &rockchip_rcu_stall_nb);
-	}
+//	if (IS_ENABLED(CONFIG_NO_GKI)) {
+//		if (IS_ENABLED(CONFIG_HARDLOCKUP_DETECTOR))
+//			atomic_notifier_chain_unregister(&hardlock_notifier_list,
+//							 &rockchip_hardlock_nb);
+//
+//		atomic_notifier_chain_unregister(&rcu_stall_notifier_list,
+//						 &rockchip_rcu_stall_nb);
+//	}
 
 	while (rockchip_cpu_debug[i])
 		iounmap(rockchip_cpu_debug[i++]);

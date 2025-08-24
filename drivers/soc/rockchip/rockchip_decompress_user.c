@@ -285,3 +285,4 @@ MODULE_LICENSE("Dual MIT/GPL");
 MODULE_VERSION("1.0.0");
 MODULE_AUTHOR("Xiao Yapeng yp.xiao@rock-chips.com");
 MODULE_DESCRIPTION("Rockchip decom driver");
+MODULE_IMPORT_NS("DMA_BUF");

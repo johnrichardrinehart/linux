@@ -255,6 +255,9 @@
 #define RK3588_PIN_BANK_FLAGS(ID, PIN, LABEL, M, P)			\
 	PIN_BANK_IOMUX_FLAGS_PULL_FLAGS(ID, PIN, LABEL, M, M, M, M, P, P, P, P)
 
+static struct pinctrl_dev *g_pctldev;
+static DEFINE_MUTEX(iomux_lock);
+
 static struct regmap_config rockchip_regmap_config = {
 	.reg_bits = 32,
 	.val_bits = 32,
@@ -4594,6 +4597,104 @@ static void __exit rockchip_pinctrl_drv_unregister(void)
 	platform_driver_unregister(&rockchip_pinctrl_driver);
 }
 module_exit(rockchip_pinctrl_drv_unregister);
+
+/**
+ * rk_iomux_set - set the rockchip iomux by pin number.
+ *
+ * @bank: the gpio bank index, from 0 to the max bank num.
+ * @pin: the gpio pin index, from 0 to 31.
+ * @mux: the pointer to store mux value.
+ *
+ * Return 0 if set success, else return error code.
+ */
+int rk_iomux_set(int bank, int pin, int mux)
+{
+	struct pinctrl_dev *pctldev = g_pctldev;
+	struct rockchip_pinctrl *info;
+	struct rockchip_pin_bank *gpio;
+	struct rockchip_pin_group *grp = NULL;
+	struct rockchip_pin_config *cfg = NULL;
+	int i, j, ret;
+
+	if (!g_pctldev)
+		return -ENODEV;
+
+	info = pinctrl_dev_get_drvdata(pctldev);
+	if (bank >= info->ctrl->nr_banks)
+		return -EINVAL;
+
+	if (pin > 31 || pin < 0)
+		return -EINVAL;
+
+	gpio = &info->ctrl->pin_banks[bank];
+
+	mutex_lock(&iomux_lock);
+	for (i = 0; i < info->ngroups; i++) {
+		grp = &info->groups[i];
+		for (j = 0; j < grp->npins; j++) {
+			if (grp->pins[j] == (gpio->pin_base + pin)) {
+				cfg = grp->data;
+				break;
+			}
+		}
+	}
+
+	ret = rockchip_set_mux(gpio, pin, mux);
+	if (ret) {
+		dev_err(info->dev, "mux GPIO%d-%d %d fail\n", bank, pin, mux);
+		goto out;
+	}
+
+	if (cfg && (cfg->func != mux))
+		cfg->func = mux;
+
+out:
+	mutex_unlock(&iomux_lock);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(rk_iomux_set);
+
+/**
+ * rk_iomux_get - get the rockchip iomux by pin number.
+ *
+ * @bank: the gpio bank index, from 0 to the max bank num.
+ * @pin: the gpio pin index, from 0 to 31.
+ * @mux: the pointer to store mux value.
+ *
+ * Return 0 if get success, else return error code.
+ */
+int rk_iomux_get(int bank, int pin, int *mux)
+{
+	struct pinctrl_dev *pctldev = g_pctldev;
+	struct rockchip_pinctrl *info;
+	struct rockchip_pin_bank *gpio;
+	int ret;
+
+	if (!g_pctldev)
+		return -ENODEV;
+	if (!mux)
+		return -EINVAL;
+
+	info = pinctrl_dev_get_drvdata(pctldev);
+	if (bank >= info->ctrl->nr_banks)
+		return -EINVAL;
+
+	if (pin > 31 || pin < 0)
+		return -EINVAL;
+
+	gpio = &info->ctrl->pin_banks[bank];
+
+	mutex_lock(&iomux_lock);
+	ret = rockchip_get_mux(gpio, pin);
+	mutex_unlock(&iomux_lock);
+
+	*mux = ret;
+
+	return (ret >= 0) ? 0 : ret;
+}
+EXPORT_SYMBOL_GPL(rk_iomux_get);
+
 
 MODULE_DESCRIPTION("ROCKCHIP Pin Controller Driver");
 MODULE_LICENSE("GPL");

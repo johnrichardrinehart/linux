@@ -57,6 +57,46 @@ static void __dma_buf_list_del(struct dma_buf *dmabuf)
 	mutex_unlock(&dmabuf_list_mutex);
 }
 
+struct dma_buf_list {
+	struct list_head head;
+	struct mutex lock;
+};
+
+static struct dma_buf_list db_list;
+
+/**
+ * dma_buf_get_each - Helps in traversing the db_list and calls the
+ * callback function which can extract required info out of each
+ * dmabuf.
+ * The db_list needs to be locked to prevent the db_list from being
+ * dynamically updated during the traversal process.
+ *
+ * @callback: [in]   Handle for each dmabuf buffer in db_list.
+ * @private:  [in]   User-defined, used to pass in when callback is
+ *                   called.
+ *
+ * Returns 0 on success, otherwise returns a non-zero value for
+ * mutex_lock_interruptible or callback.
+ */
+int dma_buf_get_each(int (*callback)(const struct dma_buf *dmabuf,
+		     void *private), void *private)
+{
+	struct dma_buf *buf;
+	int ret = mutex_lock_interruptible(&db_list.lock);
+
+	if (ret)
+		return ret;
+
+	list_for_each_entry(buf, &db_list.head, list_node) {
+		ret = callback(buf, private);
+		if (ret)
+			break;
+	}
+	mutex_unlock(&db_list.lock);
+	return ret;
+}
+//EXPORT_SYMBOL_NS_GPL(dma_buf_get_each, MINIDUMP);
+
 /**
  * dma_buf_iter_begin - begin iteration through global list of all DMA buffers
  *
@@ -122,6 +162,43 @@ struct dma_buf *dma_buf_iter_next(struct dma_buf *dmabuf)
 	mutex_unlock(&dmabuf_list_mutex);
 	return ret;
 }
+
+#if IS_ENABLED(CONFIG_RK_DMABUF_DEBUG)
+static size_t db_total_size;
+static size_t db_peak_size;
+
+void dma_buf_reset_peak_size(void)
+{
+	mutex_lock(&db_list.lock);
+	db_peak_size = 0;
+	mutex_unlock(&db_list.lock);
+}
+EXPORT_SYMBOL_GPL(dma_buf_reset_peak_size);
+
+size_t dma_buf_get_peak_size(void)
+{
+	size_t sz;
+
+	mutex_lock(&db_list.lock);
+	sz = db_peak_size;
+	mutex_unlock(&db_list.lock);
+
+	return sz;
+}
+EXPORT_SYMBOL_GPL(dma_buf_get_peak_size);
+
+size_t dma_buf_get_total_size(void)
+{
+	size_t sz;
+
+	mutex_lock(&db_list.lock);
+	sz = db_total_size;
+	mutex_unlock(&db_list.lock);
+
+	return sz;
+}
+EXPORT_SYMBOL_GPL(dma_buf_get_total_size);
+#endif
 
 static char *dmabuffs_dname(struct dentry *dentry, char *buffer, int buflen)
 {

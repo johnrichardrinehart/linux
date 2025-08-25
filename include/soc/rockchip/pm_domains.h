@@ -6,11 +6,29 @@
 #ifndef __SOC_ROCKCHIP_PM_DOMAINS_H__
 #define __SOC_ROCKCHIP_PM_DOMAINS_H__
 
+#include <linux/pm_domain.h>
 #include <linux/errno.h>
 
 struct device;
 
 #if IS_REACHABLE(CONFIG_ROCKCHIP_PM_DOMAINS)
+
+#define to_rockchip_pd(gpd) container_of(gpd, struct rockchip_pm_domain, genpd)
+
+#define MAX_QOS_REGS_NUM	5
+
+struct rockchip_pm_domain {
+	struct generic_pm_domain genpd;
+	const struct rockchip_domain_info *info;
+	struct rockchip_pmu *pmu;
+	int num_qos;
+	struct regmap **qos_regmap;
+	u32 *qos_save_regs[MAX_QOS_REGS_NUM];
+	int num_clks;
+	struct clk_bulk_data *clks;
+	struct device_node *node;
+	struct regulator *supply;
+};
 
 int rockchip_pmu_block(void);
 void rockchip_pmu_unblock(void);
@@ -18,8 +36,10 @@ int rockchip_pmu_pd_on(struct device *dev);
 int rockchip_pmu_pd_off(struct device *dev);
 bool rockchip_pmu_pd_is_on(struct device *dev);
 int rockchip_pmu_idle_request(struct device *dev, bool idle);
-int rockchip_save_qos(struct device *dev);
-int rockchip_restore_qos(struct device *dev);
+
+int rockchip_pmu_restore_qos(struct rockchip_pm_domain *pd);
+int rockchip_pmu_save_qos(struct rockchip_pm_domain *pd);
+
 void rockchip_dump_pmu(void);
 
 #else /* CONFIG_ROCKCHIP_PM_DOMAINS */

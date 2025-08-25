@@ -6,6 +6,8 @@
  *	Herman Chen <herman.chen@rock-chips.com>
  */
 
+#include "mpp_rkvdec2_link_hack_rk3568.h"
+
 #define FIX_RK3568_BUF_SIZE		(2 * PAGE_SIZE)
 #define RKDEC_HACK_DATA_RPS_OFFSET	(128 * 1)
 #define RKDEC_HACK_DATA_PPS_OFFSET	(128 * 2)

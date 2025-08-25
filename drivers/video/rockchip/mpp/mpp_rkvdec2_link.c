@@ -8,6 +8,7 @@
 
 #include <linux/delay.h>
 #include <linux/interrupt.h>
+#include <linux/pm_domain.h>
 #include <linux/pm_runtime.h>
 #include <linux/slab.h>
 #include <soc/rockchip/pm_domains.h>
@@ -579,12 +580,16 @@ static int rkvdec2_link_reset(struct mpp_dev *mpp)
 	mpp_reset_down_write(mpp->reset_group);
 	atomic_set(&mpp->reset_request, 0);
 
-	rockchip_save_qos(mpp->dev);
+	struct generic_pm_domain *genpd;
+	struct rockchip_pm_domain *pd;
+	genpd = pd_to_genpd(mpp->dev->pm_domain);
+	pd = to_rockchip_pd(genpd);
+	rockchip_pmu_save_qos(pd);
 
 	if (mpp->hw_ops->reset)
 		mpp->hw_ops->reset(mpp);
 
-	rockchip_restore_qos(mpp->dev);
+	rockchip_pmu_restore_qos(pd);
 
 	/* Note: if the domain does not change, iommu attach will be return
 	 * as an empty operation. Therefore, force to close and then open,

@@ -16,6 +16,7 @@
 #include <linux/regmap.h>
 #include <linux/workqueue.h>
 
+#include <drm/bridge/dw_hdmi.h>
 #include <drm/bridge/dw_hdmi_qp.h>
 #include <drm/display/drm_hdmi_helper.h>
 #include <drm/drm_bridge_connector.h>
@@ -427,6 +428,12 @@ static const struct of_device_id dw_hdmi_qp_rockchip_dt_ids[] = {
 };
 MODULE_DEVICE_TABLE(of, dw_hdmi_qp_rockchip_dt_ids);
 
+
+
+static const struct drm_encoder_helper_funcs dw_hdmi_rockchip_encoder_helper_funcs = {
+};
+
+
 static int dw_hdmi_qp_rockchip_bind(struct device *dev, struct device *master,
 				    void *data)
 {
@@ -552,7 +559,7 @@ static int dw_hdmi_qp_rockchip_bind(struct device *dev, struct device *master,
 		return ret;
 
 	drm_encoder_helper_add(encoder, &dw_hdmi_qp_rockchip_encoder_helper_funcs);
-	drm_simple_encoder_init(drm, encoder, DRM_MODE_ENCODER_TMDS);
+	// drm_encoder_init(drm, encoder, &dw_hdmi_rockchip_encoder_helper_funcs, DRM_MODE_ENCODER_TMDS, NULL);
 
 	platform_set_drvdata(pdev, hdmi);
 
@@ -612,6 +619,26 @@ static int __maybe_unused dw_hdmi_qp_rockchip_resume(struct device *dev)
 
 	return 0;
 }
+
+/*
+ * Register child devices like audio/cec/hdcp at late_register stage
+ * to avoid register these devie at probe/bind(which may cause
+ * infinite loop of .probe() if a component is always defer)
+ *
+ * As these devices are not that critical, so we don't check
+ * the register results here, just give warning in it's register
+ * function if it failed, let the drm bringup.
+ */
+static int dw_hdmi_encoder_late_register(struct drm_encoder *encoder)
+{
+	struct rockchip_hdmi_qp *rk_hdmi = to_rockchip_hdmi_qp(encoder);
+
+	return dw_hdmi_qp_register_cec(rk_hdmi->hdmi);
+}
+
+static const struct drm_encoder_funcs dw_hdmi_rockchip_encoder_funcs = {
+	.late_register = dw_hdmi_encoder_late_register,
+};
 
 static const struct dev_pm_ops dw_hdmi_qp_rockchip_pm = {
 	SET_SYSTEM_SLEEP_PM_OPS(NULL, dw_hdmi_qp_rockchip_resume)

@@ -15,6 +15,7 @@
 #include <linux/of.h>
 #include <linux/workqueue.h>
 
+#include <drm/bridge/dw_hdmi.h>
 #include <drm/bridge/dw_hdmi_qp.h>
 #include <drm/display/drm_hdmi_helper.h>
 #include <drm/display/drm_hdmi_state_helper.h>
@@ -28,6 +29,9 @@
 #include <sound/hdmi-codec.h>
 
 #include "dw-hdmi-qp.h"
+#include "dw-hdmi-qp-cec.h"
+
+#include <media/cec-notifier.h>
 
 #define DDC_CI_ADDR		0x37
 #define DDC_SEGMENT_ADDR	0x30
@@ -131,6 +135,17 @@ struct dw_hdmi_qp_i2c {
 };
 
 struct dw_hdmi_qp {
+  	bool dclk_en;
+
+	struct mutex mutex;		/* for state below and previous_mode */
+	struct mutex audio_mutex;
+	unsigned int sample_rate;
+	unsigned int audio_cts;
+	unsigned int audio_n;
+	bool audio_enable;
+	void (*enable_audio)(struct dw_hdmi_qp *hdmi);
+	void (*disable_audio)(struct dw_hdmi_qp *hdmi);
+
 	struct drm_bridge bridge;
 
 	struct device *dev;
@@ -144,6 +159,56 @@ struct dw_hdmi_qp {
 	struct regmap *regm;
 
 	unsigned long tmds_char_rate;
+
+	// CEC stuff
+	struct platform_device *cec;
+	struct dw_hdmi_qp_cec_data cec_data;
+
+	bool cec_enable;
+	struct cec_notifier *cec_notifier;
+	struct cec_adapter *cec_adap;
+	struct mutex cec_notifier_mutex;
+};
+
+
+static void hdmi_modb(struct dw_hdmi_qp *hdmi, u32 data, u32 mask, u32 reg)
+{
+	regmap_update_bits(hdmi->regm, reg, mask, data);
+}
+
+static inline void hdmi_writel(struct dw_hdmi_qp *hdmi, u32 val, int offset)
+{
+	regmap_write(hdmi->regm, offset, val);
+}
+
+static inline u32 hdmi_readl(struct dw_hdmi_qp *hdmi, int offset)
+{
+	unsigned int val = 0;
+
+	regmap_read(hdmi->regm, offset, &val);
+
+	return val;
+}
+
+static void dw_hdmi_qp_cec_enable(struct dw_hdmi_qp *hdmi)
+{
+	mutex_lock(&hdmi->mutex);
+	hdmi_modb(hdmi, 0, CEC_SWDISABLE, GLOBAL_SWDISABLE);
+	mutex_unlock(&hdmi->mutex);
+}
+
+static void dw_hdmi_qp_cec_disable(struct dw_hdmi_qp *hdmi)
+{
+	mutex_lock(&hdmi->mutex);
+	hdmi_modb(hdmi, CEC_SWDISABLE, CEC_SWDISABLE, GLOBAL_SWDISABLE);
+	mutex_unlock(&hdmi->mutex);
+}
+
+static const struct dw_hdmi_qp_cec_ops dw_hdmi_qp_cec_ops = {
+	.enable = dw_hdmi_qp_cec_enable,
+	.disable = dw_hdmi_qp_cec_disable,
+	.write = hdmi_writel,
+	.read = hdmi_readl,
 };
 
 static void dw_hdmi_qp_write(struct dw_hdmi_qp *hdmi, unsigned int val,
@@ -888,10 +953,17 @@ dw_hdmi_qp_bridge_edid_read(struct drm_bridge *bridge,
 {
 	struct dw_hdmi_qp *hdmi = bridge->driver_private;
 	const struct drm_edid *drm_edid;
+  const struct edid *edid;
 
 	drm_edid = drm_edid_read_ddc(connector, bridge->ddc);
 	if (!drm_edid)
 		dev_dbg(hdmi->dev, "failed to get edid\n");
+
+	if (drm_edid)
+		edid = drm_edid_raw(drm_edid);
+
+	if (hdmi->cec_notifier)
+		cec_notifier_set_phys_addr_from_edid(hdmi->cec_notifier, edid);
 
 	return drm_edid;
 }
@@ -964,12 +1036,25 @@ static int dw_hdmi_qp_bridge_write_infoframe(struct drm_bridge *bridge,
 	}
 }
 
+static void dw_hdmi_qp_bridge_detach(struct drm_bridge *bridge)
+{
+	struct dw_hdmi_qp *hdmi = bridge->driver_private;
+
+	if (hdmi->cec_notifier) {
+		mutex_lock(&hdmi->cec_notifier_mutex);
+		cec_notifier_conn_unregister(hdmi->cec_notifier);
+		hdmi->cec_notifier = NULL;
+		mutex_unlock(&hdmi->cec_notifier_mutex);
+	}
+}
+
 static const struct drm_bridge_funcs dw_hdmi_qp_bridge_funcs = {
 	.atomic_duplicate_state = drm_atomic_helper_bridge_duplicate_state,
 	.atomic_destroy_state = drm_atomic_helper_bridge_destroy_state,
 	.atomic_reset = drm_atomic_helper_bridge_reset,
 	.atomic_enable = dw_hdmi_qp_bridge_atomic_enable,
 	.atomic_disable = dw_hdmi_qp_bridge_atomic_disable,
+	.detach = dw_hdmi_qp_bridge_detach,
 	.detect = dw_hdmi_qp_bridge_detect,
 	.edid_read = dw_hdmi_qp_bridge_edid_read,
 	.hdmi_tmds_char_rate_valid = dw_hdmi_qp_bridge_tmds_char_rate_valid,
@@ -979,6 +1064,12 @@ static const struct drm_bridge_funcs dw_hdmi_qp_bridge_funcs = {
 	.hdmi_audio_shutdown = dw_hdmi_qp_audio_disable,
 	.hdmi_audio_prepare = dw_hdmi_qp_audio_prepare,
 };
+
+void dw_hdmi_qp_set_cec_adap(struct dw_hdmi_qp *hdmi, struct cec_adapter *adap)
+{
+	hdmi->cec_adap = adap;
+}
+EXPORT_SYMBOL_GPL(dw_hdmi_qp_set_cec_adap);
 
 static irqreturn_t dw_hdmi_qp_main_hardirq(int irq, void *dev_id)
 {
@@ -1009,6 +1100,56 @@ static const struct regmap_config dw_hdmi_qp_regmap_config = {
 	.max_register	= EARCRX_1_INT_FORCE,
 };
 
+static void dw_hdmi_qp_unregister_platform_device(void *pdev)
+{
+	platform_device_unregister(pdev);
+}
+
+
+int dw_hdmi_qp_register_cec(struct dw_hdmi_qp *hdmi)
+{
+	struct cec_connector_info conn_info;
+	struct cec_notifier *notifier;
+	int ret = 0;
+
+	struct platform_device_info pdevinfo = {
+		.parent = hdmi->dev,
+		.name = "dw-hdmi-qp-cec",
+		.id = PLATFORM_DEVID_AUTO,
+		.data = &hdmi->cec_data,
+		.size_data = sizeof(hdmi->cec_data),
+		.dma_mask = 0,
+	};
+
+	/*
+	 * We need hdmi cec to be registered.
+	 */
+
+	if (!hdmi->cec_enable)
+		return ret;
+
+	hdmi->cec = platform_device_register_full(&pdevinfo);
+	if (IS_ERR(hdmi->cec)) {
+		dev_err(hdmi->dev, "Cannot register %s device\n", pdevinfo.name);
+		ret = PTR_ERR(hdmi->cec);
+	} else {
+		notifier = cec_notifier_conn_register(hdmi->dev, NULL, &conn_info);
+		if (notifier) {
+			mutex_lock(&hdmi->cec_notifier_mutex);
+			hdmi->cec_notifier = notifier;
+			mutex_unlock(&hdmi->cec_notifier_mutex);
+		} else {
+			dev_warn(hdmi->dev, "Register cec notifier failed\n");
+		}
+		devm_add_action_or_reset(hdmi->dev, dw_hdmi_qp_unregister_platform_device,
+					 hdmi->cec);
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(dw_hdmi_qp_register_cec);
+
+
 static void dw_hdmi_qp_init_hw(struct dw_hdmi_qp *hdmi)
 {
 	dw_hdmi_qp_write(hdmi, 0, MAINUNIT_0_INT_MASK_N);
@@ -1038,6 +1179,9 @@ struct dw_hdmi_qp *dw_hdmi_qp_bind(struct platform_device *pdev,
 	struct dw_hdmi_qp *hdmi;
 	void __iomem *regs;
 	int ret;
+
+  int irq;
+	struct device_node *np = dev->of_node;
 
 	if (!plat_data->phy_ops || !plat_data->phy_ops->init ||
 	    !plat_data->phy_ops->disable || !plat_data->phy_ops->read_hpd) {
@@ -1100,6 +1244,23 @@ struct dw_hdmi_qp *dw_hdmi_qp_bind(struct platform_device *pdev,
 				DRM_BRIDGE_ATTACH_NO_CONNECTOR);
 	if (ret)
 		return ERR_PTR(ret);
+
+	if (of_property_read_bool(np, "cec-enable")) {
+		hdmi->cec_enable = true;
+		irq = platform_get_irq(pdev, 1);
+		if (irq < 0) {
+			ret = irq;
+			goto err_ddc;
+		}
+
+		hdmi->cec_data.irq  = irq;
+		hdmi->cec_data.hdmi = hdmi;
+		hdmi->cec_data.ops = &dw_hdmi_qp_cec_ops;
+	};
+
+  err_ddc:
+	if (hdmi->i2c)
+		i2c_del_adapter(&hdmi->i2c->adap);
 
 	return hdmi;
 }

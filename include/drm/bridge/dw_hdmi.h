@@ -131,6 +131,7 @@ struct dw_hdmi_plat_data {
 	unsigned long input_bus_encoding;
 	bool use_drm_infoframe;
 	bool ycbcr_420_allowed;
+	bool is_hdmi_qp;
 
 	/*
 	 * Private data passed to all the .mode_valid() and .configure_phy()
@@ -207,5 +208,11 @@ void dw_hdmi_phy_update_hpd(struct dw_hdmi *hdmi, void *data,
 void dw_hdmi_phy_setup_hpd(struct dw_hdmi *hdmi, void *data);
 
 bool dw_hdmi_bus_fmt_is_420(struct dw_hdmi *hdmi);
+
+struct dw_hdmi_qp;
+struct cec_adapter;
+void dw_hdmi_qp_set_cec_adap(struct dw_hdmi_qp *hdmi, struct cec_adapter *adap);
+
+int dw_hdmi_qp_register_cec(struct dw_hdmi_qp *hdmi);
 
 #endif /* __IMX_HDMI_H__ */

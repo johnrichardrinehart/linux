@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+
+menuconfig VIDEO_ROCKCHIP
+	bool "Rockchip Video Devices"
+	depends on ARCH_ROCKCHIP || COMPILE_TEST
+	help
+	  Support for Rockchip video processing devices including
+	  hardware video encoders, decoders, and post-processors.
+
+if VIDEO_ROCKCHIP
+
+source "drivers/video/rockchip/mpp/Kconfig"
+
+endif # VIDEO_ROCKCHIP

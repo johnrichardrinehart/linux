@@ -18,6 +18,7 @@
 #include <linux/iopoll.h>
 #include <linux/list.h>
 #include <linux/mm.h>
+#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/of.h>
 #include <linux/of_platform.h>
@@ -126,6 +127,8 @@ struct rk_iommudata {
 
 static const struct rk_iommu_ops *rk_ops;
 static struct iommu_domain rk_identity_domain;
+
+static struct rk_iommu *rk_iommu_from_dev(struct device *dev);
 
 static inline void rk_table_flush(struct rk_iommu_domain *dom, dma_addr_t dma,
 				  unsigned int count)
@@ -579,6 +582,32 @@ print_it:
 		rk_pte_is_page_valid(pte), &page_addr_phys, page_flags);
 }
 
+int rockchip_pagefault_done(struct device *master_dev)
+{
+	struct rk_iommu *iommu = rk_iommu_from_dev(master_dev);
+	int i;
+
+	if (!iommu)
+		return -ENODEV;
+
+	for (i = 0; i < iommu->num_mmu; i++)
+		rk_iommu_base_command(iommu->bases[i], RK_MMU_CMD_PAGE_FAULT_DONE);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(rockchip_pagefault_done);
+
+void __iomem *rockchip_get_iommu_base(struct device *master_dev, int idx)
+{
+	struct rk_iommu *iommu = rk_iommu_from_dev(master_dev);
+
+	if (!iommu || idx >= iommu->num_mmu)
+		return NULL;
+
+	return iommu->bases[idx];
+}
+EXPORT_SYMBOL_GPL(rockchip_get_iommu_base);
+
 static irqreturn_t rk_iommu_irq(int irq, void *dev_id)
 {
 	struct rk_iommu *iommu = dev_id;
@@ -924,6 +953,18 @@ static void rk_iommu_disable(struct rk_iommu *iommu)
 	clk_bulk_disable(iommu->num_clocks, iommu->clocks);
 }
 
+int rockchip_iommu_disable(struct device *dev)
+{
+	struct rk_iommu *iommu = rk_iommu_from_dev(dev);
+
+	if (!iommu)
+		return -ENODEV;
+
+	rk_iommu_disable(iommu);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(rockchip_iommu_disable);
+
 /* Must be called with iommu powered on and attached */
 static int rk_iommu_enable(struct rk_iommu *iommu)
 {
@@ -958,6 +999,48 @@ out_disable_clocks:
 	clk_bulk_disable(iommu->num_clocks, iommu->clocks);
 	return ret;
 }
+
+int rockchip_iommu_enable(struct device *dev)
+{
+	struct rk_iommu *iommu = rk_iommu_from_dev(dev);
+
+	if (!iommu)
+		return -ENODEV;
+
+	return rk_iommu_enable(iommu);
+}
+EXPORT_SYMBOL_GPL(rockchip_iommu_enable);
+
+void rockchip_iommu_mask_irq(struct device *dev)
+{
+	struct rk_iommu *iommu = rk_iommu_from_dev(dev);
+	int i;
+
+	if (!iommu)
+		return;
+
+	for (i = 0; i < iommu->num_mmu; i++)
+		rk_iommu_write(iommu->bases[i], RK_MMU_INT_MASK, 0);
+}
+EXPORT_SYMBOL_GPL(rockchip_iommu_mask_irq);
+
+void rockchip_iommu_unmask_irq(struct device *dev)
+{
+	struct rk_iommu *iommu = rk_iommu_from_dev(dev);
+	int i;
+
+	if (!iommu)
+		return;
+
+	for (i = 0; i < iommu->num_mmu; i++) {
+		/* Need to zap tlb in case of mapping during pagefault */
+		rk_iommu_base_command(iommu->bases[i], RK_MMU_CMD_ZAP_CACHE);
+		rk_iommu_write(iommu->bases[i], RK_MMU_INT_MASK, RK_MMU_IRQ_MASK);
+		/* Leave iommu in pagefault state until mapping finished */
+		rk_iommu_base_command(iommu->bases[i], RK_MMU_CMD_PAGE_FAULT_DONE);
+	}
+}
+EXPORT_SYMBOL_GPL(rockchip_iommu_unmask_irq);
 
 static int rk_iommu_identity_attach(struct iommu_domain *identity_domain,
 				    struct device *dev)
@@ -1356,7 +1439,13 @@ static const struct of_device_id rk_iommu_dt_ids[] = {
 	{	.compatible = "rockchip,iommu",
 		.data = &iommu_data_ops_v1,
 	},
+	{	.compatible = "rockchip,iommu-v2",
+		.data = &iommu_data_ops_v2,
+	},
 	{	.compatible = "rockchip,rk3568-iommu",
+		.data = &iommu_data_ops_v2,
+	},
+	{	.compatible = "rockchip,iommu-av1d",
 		.data = &iommu_data_ops_v2,
 	},
 	{ /* sentinel */ }
@@ -1372,4 +1461,20 @@ static struct platform_driver rk_iommu_driver = {
 		   .suppress_bind_attrs = true,
 	},
 };
-builtin_platform_driver(rk_iommu_driver);
+
+static int __init rk_iommu_init(void)
+{
+	return platform_driver_register(&rk_iommu_driver);
+}
+module_init(rk_iommu_init);
+
+static void __exit rk_iommu_exit(void)
+{
+	platform_driver_unregister(&rk_iommu_driver);
+}
+module_exit(rk_iommu_exit);
+
+MODULE_DESCRIPTION("IOMMU API for Rockchip");
+MODULE_AUTHOR("Simon Xue <xxm@rock-chips.com>");
+MODULE_AUTHOR("Daniel Kurtz <djkurtz@chromium.org>");
+MODULE_LICENSE("GPL");

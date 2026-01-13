@@ -6,3 +6,6 @@
 
 #include "rk3588-base.dtsi"
 #include "rk3588-opp.dtsi"
+
+#include "rk3588s-mpp.dtsi"
+#include "rk3588s-vendor-extensions.dtsi"

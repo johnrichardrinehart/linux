@@ -22,4 +22,20 @@ static inline void rockchip_pmu_unblock(void) { }
 
 #endif /* CONFIG_ROCKCHIP_PM_DOMAINS */
 
+/* Vendor-specific stubs for MPP drivers */
+static inline int rockchip_pmu_idle_request(struct device *dev, bool idle)
+{
+	return 0;  /* Stub - no idle control */
+}
+
+static inline int rockchip_save_qos(struct device *dev)
+{
+	return 0;  /* Stub - no QoS saving */
+}
+
+static inline int rockchip_restore_qos(struct device *dev)
+{
+	return 0;  /* Stub - no QoS restoring */
+}
+
 #endif /* __SOC_ROCKCHIP_PM_DOMAINS_H__ */

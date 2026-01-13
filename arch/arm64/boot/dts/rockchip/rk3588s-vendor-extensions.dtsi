@@ -1,0 +1,73 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Rockchip RK3588S Vendor Extensions
+ * Additional hardware nodes from vendor kernels not yet in mainline
+ *
+ * This file contains ONLY nodes compatible with mainline clock/power definitions.
+ * Vendor USB and display routing nodes are omitted as they require vendor-specific
+ * clock constants and conflict with mainline implementations.
+ */
+
+/ {
+	/* NPU - Neural Processing Unit (6 TOPS AI accelerator) */
+	rknpu: npu@fdab0000 {
+		compatible = "rockchip,rk3588-rknpu";
+		reg = <0x0 0xfdab0000 0x0 0x10000>,
+		      <0x0 0xfdac0000 0x0 0x10000>,
+		      <0x0 0xfdad0000 0x0 0x10000>;
+		interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH 0>,
+			     <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH 0>,
+			     <GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH 0>;
+		interrupt-names = "npu0_irq", "npu1_irq", "npu2_irq";
+		clocks = <&scmi_clk SCMI_CLK_NPU>, <&cru ACLK_NPU0>,
+			 <&cru ACLK_NPU1>, <&cru ACLK_NPU2>,
+			 <&cru HCLK_NPU0>, <&cru HCLK_NPU1>,
+			 <&cru HCLK_NPU2>, <&cru PCLK_NPU_ROOT>;
+		clock-names = "clk_npu", "aclk0",
+			      "aclk1", "aclk2",
+			      "hclk0", "hclk1",
+			      "hclk2", "pclk";
+		assigned-clocks = <&scmi_clk SCMI_CLK_NPU>;
+		assigned-clock-rates = <200000000>;
+		resets = <&cru SRST_A_RKNN0>, <&cru SRST_A_RKNN1>, <&cru SRST_A_RKNN2>,
+			 <&cru SRST_H_RKNN0>, <&cru SRST_H_RKNN1>, <&cru SRST_H_RKNN2>;
+		reset-names = "srst_a0", "srst_a1", "srst_a2",
+			      "srst_h0", "srst_h1", "srst_h2";
+		power-domains = <&power RK3588_PD_NPUTOP>,
+				<&power RK3588_PD_NPU1>,
+				<&power RK3588_PD_NPU2>;
+		power-domain-names = "npu0", "npu1", "npu2";
+		iommus = <&rknpu_mmu>;
+		status = "disabled";
+	};
+
+	rknpu_mmu: iommu@fdab8000 {
+		compatible = "rockchip,rk3588-iommu", "rockchip,iommu-v2";
+		reg = <0x0 0xfdab8000 0x0 0x40>;
+		interrupts = <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH 0>;
+		clocks = <&cru HCLK_NPU1>;
+		clock-names = "aclk", "iface";
+		power-domains = <&power RK3588_PD_NPUTOP>;
+		#iommu-cells = <0>;
+		status = "disabled";
+	};
+
+	/* Dynamic Memory Controller - for memory frequency scaling */
+	dmc: dmc {
+		compatible = "rockchip,rk3588-dmc";
+		interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH 0>;
+		interrupt-names = "complete";
+		devfreq-events = <&dfi>;
+		clocks = <&scmi_clk 4>;
+		clock-names = "dmc_clk";
+		upthreshold = <40>;
+		downdifferential = <20>;
+		status = "disabled";
+	};
+
+	/* Suspend/Resume framework */
+	rockchip_suspend: rockchip-suspend {
+		compatible = "rockchip,pm-rk3588";
+		status = "disabled";
+	};
+};

@@ -574,7 +574,12 @@ static int rkvdec2_link_reset(struct mpp_dev *mpp)
 	disable_irq(mpp->irq);
 	mpp_iommu_disable_irq(mpp->iommu_info);
 
-	/* FIXME lock resource lock of the other devices in combo */
+	/*
+	 * NOTE: Missing cross-device locking for combo reset scenarios.
+	 * See detailed explanation in mpp_common.c:707. This is the same issue
+	 * in the link mode reset path - we don't lock other devices in the
+	 * reset_group during reset operations.
+	 */
 	mpp_iommu_down_write(mpp->iommu_info);
 	mpp_reset_down_write(mpp->reset_group);
 	atomic_set(&mpp->reset_request, 0);

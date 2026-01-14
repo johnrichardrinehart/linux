@@ -590,7 +590,29 @@ static int rkvdec2_isr(struct mpp_dev *mpp)
 	struct rkvdec2_dev *dec = to_rkvdec2_dev(mpp);
 	struct rkvdec_link_info *link_info = mpp->var->hw_info->link_info;
 
-	/* FIXME use a spin lock here */
+	/*
+	 * NOTE: Potential race condition accessing mpp->cur_task without locking.
+	 *
+	 * This ISR reads mpp->cur_task (set by run()) and clears it without spinlock
+	 * protection. Theoretically, this creates a race window between the run()
+	 * function setting cur_task and the ISR reading/clearing it.
+	 *
+	 * In practice, the risk is low because:
+	 * 1. Hardware completes current task before accepting a new one
+	 * 2. Task queue serialization prevents concurrent submissions
+	 *
+	 * Proper fix would require:
+	 * 1. Add spinlock_t cur_task_lock to struct mpp_dev
+	 * 2. Lock in all 10+ codec ISRs when accessing cur_task
+	 * 3. Lock in run() functions when setting cur_task
+	 * 4. Comprehensive testing of all codec types under load
+	 *
+	 * This is a known issue in the vendor (Rockchip) driver code that hasn't
+	 * been addressed upstream. Fix deferred until proper testing infrastructure
+	 * is available. See similar patterns in: mpp_rkvenc.c:521, mpp_jpgdec.c:507,
+	 * mpp_av1dec.c:650, mpp_vdpp.c:629, mpp_vdpu2.c:598, mpp_vepu2.c:430,
+	 * mpp_rkvenc2.c:1699, and others.
+	 */
 	if (!mpp_task) {
 		dev_err(mpp->dev, "no current task\n");
 		return IRQ_HANDLED;

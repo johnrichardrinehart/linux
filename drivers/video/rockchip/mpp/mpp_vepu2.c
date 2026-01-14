@@ -498,10 +498,17 @@ static int vepu_result(struct mpp_dev *mpp,
 	u32 i;
 	struct mpp_request *req;
 	struct vepu_task *task = to_vepu_task(mpp_task);
+	const u32 reg_size = sizeof(task->reg);
 
-	/* FIXME may overflow the kernel */
 	for (i = 0; i < task->r_req_cnt; i++) {
 		req = &task->r_reqs[i];
+
+		/* Validate buffer bounds to prevent kernel memory disclosure */
+		if (req->offset + req->size > reg_size) {
+			mpp_err("Invalid read request: offset=%u size=%u exceeds buffer=%u\n",
+				req->offset, req->size, reg_size);
+			return -EINVAL;
+		}
 
 		if (copy_to_user(req->data,
 				 (u8 *)task->reg + req->offset,

@@ -5,5 +5,8 @@
 obj-$(CONFIG_ROCKCHIP_GRF) += grf.o
 obj-$(CONFIG_ROCKCHIP_IODOMAIN) += io-domain.o
 obj-$(CONFIG_ROCKCHIP_DTPM) += dtpm.o
+obj-$(CONFIG_ROCKCHIP_IPA) += rockchip_ipa.o
 obj-$(CONFIG_ROCKCHIP_OPP) += rockchip_opp_select.o
+obj-$(CONFIG_ROCKCHIP_SYSTEM_MONITOR) += rockchip_system_monitor.o
+obj-$(CONFIG_ROCKCHIP_SUSPEND_MODE) += rockchip_pm_config.o
 obj-$(CONFIG_ROCKCHIP_PM_DOMAINS) += pm_domains_stub.o

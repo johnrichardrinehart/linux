@@ -10,5 +10,6 @@ menuconfig VIDEO_ROCKCHIP
 if VIDEO_ROCKCHIP
 
 source "drivers/video/rockchip/mpp/Kconfig"
+source "drivers/video/rockchip/rga3/Kconfig"
 
 endif # VIDEO_ROCKCHIP

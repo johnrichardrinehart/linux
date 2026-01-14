@@ -8,9 +8,14 @@
  */
 
 / {
-	/* NPU - Neural Processing Unit (6 TOPS AI accelerator) */
+	/*
+	 * NPU - Neural Processing Unit (6 TOPS AI accelerator)
+	 * Uses mainline Rocket driver by default.
+	 * To use vendor RKNPU driver instead, change compatible to:
+	 *   compatible = "rockchip,rk3588-rknpu";
+	 */
 	rknpu: npu@fdab0000 {
-		compatible = "rockchip,rk3588-rknpu";
+		compatible = "rockchip,rk3588-rknn-core";
 		reg = <0x0 0xfdab0000 0x0 0x10000>,
 		      <0x0 0xfdac0000 0x0 0x10000>,
 		      <0x0 0xfdad0000 0x0 0x10000>;

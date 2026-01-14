@@ -8,18 +8,6 @@
 
 #include <linux/pm_opp.h>
 
-/* Forward declarations for vendor typedefs from 6.1 that don't exist in 6.18.2 */
-struct dev_pm_opp;
-struct opp_table;
-struct regulator;
-
-typedef int (*config_regulators_t)(struct device *dev,
-			struct dev_pm_opp *old_opp, struct dev_pm_opp *new_opp,
-			struct regulator **regulators, unsigned int count);
-
-typedef int (*config_clks_t)(struct device *dev, struct opp_table *opp_table,
-			struct dev_pm_opp *opp, void *data, bool scaling_down);
-
 #define VOLT_RM_TABLE_END	~1
 
 /*

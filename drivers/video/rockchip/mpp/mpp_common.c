@@ -704,7 +704,29 @@ int mpp_dev_reset(struct mpp_dev *mpp)
 
 	if (mpp->auto_freq_en && mpp->hw_ops->reduce_freq)
 		mpp->hw_ops->reduce_freq(mpp);
-	/* FIXME lock resource lock of the other devices in combo */
+	/*
+	 * NOTE: Missing cross-device locking for combo (multi-device) reset scenarios.
+	 *
+	 * Some SoCs have multiple codec blocks sharing reset lines via reset_group.
+	 * Currently, we only lock this device's IOMMU and reset semaphore, but don't
+	 * lock other devices in the same reset_group. This could theoretically allow
+	 * concurrent access to shared reset infrastructure during device reset.
+	 *
+	 * Proper fix would require:
+	 * 1. Iterate through all devices in mpp->reset_group
+	 * 2. Acquire their IOMMU/resource locks in deterministic order (e.g., by address)
+	 * 3. Perform reset operations
+	 * 4. Release locks in reverse order
+	 *
+	 * Complexity:
+	 * - Must avoid deadlock between multiple devices trying to reset
+	 * - Lock ordering must be consistent across all reset paths
+	 * - Affects: mpp_common.c:707, mpp_rkvdec2_link.c:577
+	 *
+	 * This is a known issue in the vendor (Rockchip) driver code that hasn't
+	 * been addressed upstream. Fix requires vendor collaboration to understand
+	 * reset_group semantics and test on hardware with actual combo configurations.
+	 */
 	mpp_iommu_down_write(mpp->iommu_info);
 	mpp_reset_down_write(mpp->reset_group);
 	atomic_set(&mpp->reset_request, 0);
@@ -1940,7 +1962,7 @@ int mpp_check_req(struct mpp_request *req, int base,
 	if ((req_off + req->size) > max_size) {
 		mpp_err("error: req_off %x, req_size %x, max_size %x\n",
 			req_off, req->size, max_size);
-		req->size = req_off + req->size - max_size;
+		return -EINVAL;
 	}
 
 	return 0;

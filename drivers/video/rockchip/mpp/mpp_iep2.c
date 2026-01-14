@@ -766,10 +766,17 @@ static int iep2_result(struct mpp_dev *mpp,
 	u32 i;
 	struct mpp_request *req;
 	struct iep_task *task = to_iep_task(mpp_task);
+	const u32 output_size = sizeof(task->output);
 
-	/* FIXME may overflow the kernel */
 	for (i = 0; i < task->r_req_cnt; i++) {
 		req = &task->r_reqs[i];
+
+		/* Validate buffer bounds to prevent kernel memory disclosure */
+		if (req->size > output_size) {
+			mpp_err("Invalid read request: size=%u exceeds buffer=%u\n",
+				req->size, output_size);
+			return -EINVAL;
+		}
 
 		if (copy_to_user(req->data, (u8 *)&task->output, req->size)) {
 			mpp_err("copy_to_user reg fail\n");

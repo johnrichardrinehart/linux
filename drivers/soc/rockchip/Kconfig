@@ -30,4 +30,35 @@ config ROCKCHIP_DTPM
 	  on this platform. That will create all the power capping capable
 	  devices.
 
+config ROCKCHIP_IPA
+	tristate "Rockchip IPA support"
+	depends on THERMAL
+	help
+	  Say y here to enable rockchip IPA.
+	  It will use thermal framework's mechanism to calculate
+	  the SOC energy model power.
+
+config ROCKCHIP_OPP
+	tristate "Rockchip OPP select support"
+	depends on PM_DEVFREQ
+	select ROCKCHIP_IPA
+	help
+	  Say y here to enable rockchip OPP support.
+
+config ROCKCHIP_SYSTEM_MONITOR
+	tristate "Rockchip System Monitor support"
+	depends on PM_DEVFREQ && ROCKCHIP_OPP
+	help
+	  Say y here to enable rockchip system monitor support.
+
+config ROCKCHIP_SUSPEND_MODE
+	tristate "Rockchip suspend mode config"
+	depends on SUSPEND && ROCKCHIP_SIP
+	help
+	  Suspend mode configuration for Rockchip SoCs via ATF.
+
+	  Supports multiple suspend modes (mem, mem-lite, mem-ultra)
+	  with different power saving characteristics and wake latencies.
+	  Also provides virtual poweroff functionality.
+
 endif
